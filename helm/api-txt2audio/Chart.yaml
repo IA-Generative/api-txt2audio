@@ -1,0 +1,6 @@
+apiVersion: v2
+name: api-txt2audio
+description: A FastAPI-based text-to-speech API
+type: application
+version: 0.1.0
+appVersion: "1.0"
