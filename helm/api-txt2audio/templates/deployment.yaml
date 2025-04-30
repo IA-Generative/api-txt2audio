@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-txt2audio.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "api-txt2audio.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "api-txt2audio.name" . }}
+    spec:
+      containers:
+        - name: api-txt2audio
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: 80
