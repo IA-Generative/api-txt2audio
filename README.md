@@ -85,4 +85,3 @@ Assurez-vous que votre domaine (`api.example.com`) pointe vers l'adresse IP de v
    kubectl get ingress
    kubectl describe certificate
    ```
-Ce dépôt est maintenant prêt pour un déploiement sécurisé de votre API FastAPI de synthèse vocale sur Kubernetes avec TLS. 
