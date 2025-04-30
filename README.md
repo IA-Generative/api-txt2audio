@@ -21,7 +21,6 @@ Assurez-vous que `cert-manager` est installé et configuré pour gérer les cert
 ## Accès à l'API
 
 L'API sera accessible via HTTPS à l'adresse `https://api.example.com`.
-```
 
 ---
 
