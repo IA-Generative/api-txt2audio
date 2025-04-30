@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+torch
+numpy
+struct
+langdetect
+huggingface_hub
+kokoro
