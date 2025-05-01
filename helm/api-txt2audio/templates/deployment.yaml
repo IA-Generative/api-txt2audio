@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "api-txt2audio.fullname" . }}
+  labels:
+    app: {{ include "api-txt2audio.name" . }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -15,5 +17,11 @@ spec:
       containers:
         - name: api-txt2audio
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: 80
+          resources:
+            {{- if .Values.gpu.enabled }}
+            limits:
+              nvidia.com/gpu: {{ .Values.gpu.count }}
+            {{- end }}
