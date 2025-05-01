@@ -24,3 +24,7 @@ ingress:
     - hosts:
         - api.example.com
       secretName: api-txt2audio-tls
+
+gpu:
+  enabled: false  # Mettre à true pour activer le GPU
+  count: 1        # Nombre de GPU à allouer
