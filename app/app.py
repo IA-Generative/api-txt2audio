@@ -1,3 +1,5 @@
+import functools
+import re
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,10 +9,9 @@ import torch
 import struct
 import numpy as np
 import subprocess
-from langdetect import detect  # Ajout pour la détection de langue
+from langdetect import detect
 
 app = FastAPI()
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,53 +20,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-pipeline = None
-current_voice = None
-current_language_code = None  # On garde aussi la langue détectée
-
-# Mapping langdetect ➔ code de ta liste
 LANGUAGE_CODE_MAPPING = {
-    'en': 'a',  # 🇺🇸 American English par défaut
-    'fr': 'f',  # 🇫🇷 French
-    'es': 's',  # 🇪🇸 Spanish
-    'it': 'i',  # 🇮🇹 Italian
-    'pt': 'b',  # 🇧🇷 Brazilian Portuguese
-    'hi': 'h',  # 🇮🇳 Hindi
-    'ja': 'j',  # 🇯🇵 Japanese
-    'zh-cn': 'm',  # 🇨🇳 Mandarin
-    'zh-tw': 'm',  # 🇨🇳 Mandarin
-    'en-gb': 'b',  # 🇬🇧 British English
+    'en': 'a',   # 🇺🇸 American English par défaut
+    'fr': 'f',   # 🇫🇷 French
+    'es': 'e',   # 🇪🇸 Spanish
+    'it': 'i',   # 🇮🇹 Italian
+    'pt': 'p',   # 🇧🇷 Brazilian Portuguese
+    'hi': 'h',   # 🇮🇳 Hindi
+    'ja': 'j',   # 🇯🇵 Japanese
+    'zh-cn': 'z',# 🇨🇳 Mandarin
+    'zh-tw': 'z',# 🇨🇳 Mandarin
+    'en-gb': 'b',# 🇬🇧 British English
 }
 
-# Chargement des fichiers de voix disponibles
+# --- Chargement et parsing des voix du repo HuggingFace ---
 files = list_repo_files("hexgrad/Kokoro-82M", repo_type="model")
 voices = [f.split("/")[-1].replace(".pt", "") for f in files if f.startswith("voices/")]
 
-# Construction du lookup { nom: (voix complète, code langue) }
-voice_lookup = {}
+voice_db = []
 for voice in voices:
-    underscore_index = voice.find("_")
-    if underscore_index == -1:
+    # Pattern : 2 lettres + '_' + nom
+    m = re.match(r"([a-z])([mf])_(.+)", voice)
+    if not m:
         continue
-    name = voice[underscore_index + 1:].lower()
-    language_code = voice[0]
-    voice_lookup[name] = (voice, language_code)
+    lang, gender, name = m.groups()
+    voice_db.append({
+        "full": voice,         # nom complet (ex: ff_siwis)
+        "lang": lang,          # code langue (ex: f)
+        "gender": gender,      # m/f
+        "name": name.lower()   # nom de la voix, en minuscule
+    })
 
-# Jetons valides
 ALLOWED_TOKENS = {
     "token_client_a",
     "token_client_b",
     "token_admin_123",
 }
-
-def select_voice(requested: str) -> (str, str):
-    requested = requested.lower().strip()
-    if requested in voice_lookup:
-        return voice_lookup[requested]
-    for name, (voice_name, language_code) in voice_lookup.items():
-        if requested in name:
-            return voice_name, language_code
-    return "ff_siwis", "f"
 
 def detect_language(text: str) -> str:
     try:
@@ -76,35 +66,71 @@ def detect_language(text: str) -> str:
         detected_lang = 'en'
     return LANGUAGE_CODE_MAPPING.get(detected_lang, 'a')
 
-def setup_pipeline_for_voice(voice_name: str, override_language: str):
-    global pipeline, current_voice, current_language_code
+def select_voice(requested: str, detected_language_code: str, requested_gender: str = None):
+    requested = (requested or "").lower().strip()
+    requested_gender = (requested_gender or "").lower().strip()
+    if requested_gender and requested_gender not in ("m", "f"):
+        requested_gender = None
 
-    # Si même voix et même langue détectée, ne rien faire
-    if current_voice == voice_name and current_language_code == override_language:
-        return
+    # 1. Recherche stricte : nom + langue + genre
+    candidates = [
+        v for v in voice_db
+        if v["name"] == requested and v["lang"] == detected_language_code and (not requested_gender or v["gender"] == requested_gender)
+    ]
+    if candidates:
+        print(f"✅ Voix exacte trouvée (nom+langue+genre): {candidates[0]['full']}")
+        return candidates[0]['full'], candidates[0]['lang']
 
-    # Télécharger le fichier modèle
+    # 2. Nom + langue (genre ignoré)
+    candidates = [
+        v for v in voice_db
+        if v["name"] == requested and v["lang"] == detected_language_code
+    ]
+    if candidates:
+        print(f"✅ Voix trouvée (nom+langue): {candidates[0]['full']}")
+        return candidates[0]['full'], candidates[0]['lang']
+
+    # 3. Langue + genre demandé (voix générique)
+    if requested_gender:
+        candidates = [
+            v for v in voice_db
+            if v["lang"] == detected_language_code and v["gender"] == requested_gender
+        ]
+        if candidates:
+            print(f"🟡 Fallback voix générique (langue+genre): {candidates[0]['full']}")
+            return candidates[0]['full'], candidates[0]['lang']
+
+    # 4. N'importe quelle voix dans la langue concernée
+    candidates = [
+        v for v in voice_db
+        if v["lang"] == detected_language_code
+    ]
+    if candidates:
+        print(f"🟡 Fallback voix générique (langue): {candidates[0]['full']}")
+        return candidates[0]['full'], candidates[0]['lang']
+
+    # 5. Si aucune voix pour cette langue, on prend la première voix dispo dans la base
+    if voice_db:
+        print(f"🔴 Fallback ultime : première voix du voice_db ({voice_db[0]['full']})")
+        return voice_db[0]['full'], voice_db[0]['lang']
+
+    # 6. Aucune voix du tout
+    print("❌ Aucune voix trouvée")
+    return "ff_siwis", "f"
+
+@functools.lru_cache(maxsize=8)
+def get_pipeline(voice_name: str, override_language: str):
     try:
         local_path = hf_hub_download(
             repo_id="hexgrad/Kokoro-82M",
             repo_type="model",
             filename=f"voices/{voice_name}.pt",
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to download voice model: {e}")
-
-    # Créer le pipeline avec la langue détectée (override)
-    try:
         p = KPipeline(lang_code=override_language)
         p.load_voice(local_path)
+        return p
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to initialize voice pipeline: {e}")
-
-    assert p is not None, "Pipeline creation returned None"
-
-    pipeline = p
-    current_voice = voice_name
-    current_language_code = override_language
+        raise RuntimeError(f"Failed to setup pipeline: {e}")
 
 def make_wav_header(num_channels=1, sample_rate=24000, bits_per_sample=16):
     byte_rate = sample_rate * num_channels * bits_per_sample // 8
@@ -125,25 +151,19 @@ async def speech(
     token = authorization.split(" ", 1)[1]
     if token not in ALLOWED_TOKENS:
         raise HTTPException(status_code=403, detail="Forbidden")
-
     body = await request.json()
     text = body.get("input", "")
     requested_voice = body.get("voice", "")
+    requested_gender = body.get("gender", None)
     response_format = body.get("response_format", "wav").lower()
-
-    voice_full, _ = select_voice(requested_voice)
     detected_language_code = detect_language(text)
 
+    voice_full, used_language_code = select_voice(requested_voice, detected_language_code, requested_gender)
     try:
-        setup_pipeline_for_voice(voice_full, detected_language_code)
-    except HTTPException as e:
-        raise e
+        pipeline = get_pipeline(voice_full, used_language_code)
     except Exception as e:
-        print(f"❌ Unexpected setup error: {e}")
-        raise HTTPException(status_code=500, detail="Unexpected error during pipeline setup.")
-
-    if pipeline is None:
-        raise HTTPException(status_code=500, detail="Pipeline initialization failed.")
+        print(f"❌ Pipeline setup error: {e}")
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
 
     generator = pipeline(text, voice=voice_full)
 
@@ -151,13 +171,9 @@ async def speech(
         def generate_opus():
             wav_data = make_wav_header()
             for _, _, audio in generator:
-                if isinstance(audio, torch.Tensor):
-                    audio_np = audio.cpu().numpy()
-                else:
-                    audio_np = audio
+                audio_np = audio.cpu().numpy() if isinstance(audio, torch.Tensor) else audio
                 pcm = (audio_np * 32767).astype(np.int16).tobytes()
                 wav_data += pcm
-
             process = subprocess.Popen(
                 ["ffmpeg", "-f", "wav", "-i", "pipe:0", "-f", "ogg", "-acodec", "libopus", "-ar", "24000", "pipe:1"],
                 stdin=subprocess.PIPE,
@@ -165,23 +181,16 @@ async def speech(
                 stderr=subprocess.PIPE
             )
             out, err = process.communicate(wav_data)
-
             if process.returncode != 0:
                 print("❌ FFmpeg error:", err.decode())
                 raise HTTPException(status_code=500, detail="Audio encoding failed")
-
             yield out
-
         return StreamingResponse(generate_opus(), media_type="audio/ogg")
 
     def chunks():
         yield make_wav_header()
         for _, _, audio in generator:
-            if isinstance(audio, torch.Tensor):
-                audio_np = audio.cpu().numpy()
-            else:
-                audio_np = audio
+            audio_np = audio.cpu().numpy() if isinstance(audio, torch.Tensor) else audio
             pcm = (audio_np * 32767).astype(np.int16).tobytes()
             yield pcm
-
     return StreamingResponse(chunks(), media_type="audio/wav")
