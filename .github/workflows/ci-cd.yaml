@@ -1,0 +1,66 @@
+name: ci-cd
+
+on:
+  push:
+    branches:
+      - 'main'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  SERVICE_NAME: github-k8s-example
+  NAMESPACE: github-k8s-example
+  APPLICATION_PORT: 8080
+  REPLICAS: 1
+  PYTHON_VERSION: 3.12
+
+jobs:
+  publish-docker-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          #tags: type=semver,pattern={{version}},latest=true
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: .  # Build Docker image from the current directory (i.e., the root of the repository)
+          push: true   # Push the built Docker image to GitHub Packages
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+
+  deploy:
+    needs: publish-docker-image
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Kubeconfig
+      env:
+        KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
+      run: |
+        mkdir $HOME/.kube
+        echo "$KUBECONFIG_CONTENT" > $HOME/.kube/config
+    - name: Deploy to Kubernetes
+      run: |
+        envsubst < deployment.yaml | kubectl apply -f -
