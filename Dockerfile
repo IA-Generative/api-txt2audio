@@ -1,40 +1,69 @@
+# Base CUDA + cuDNN + Ubuntu 24.04
 FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04
 
+# ---- Environnement ----
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:${PATH}"
 
-# 1) Dépendances système (root)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 python3-venv python3-pip \
-      git ffmpeg build-essential \
-  && rm -rf /var/lib/apt/lists/*
+# ---- Dépendances système (root) ----
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        python3 python3-venv python3-pip \
+        git ffmpeg build-essential ca-certificates curl; \
+    rm -rf /var/lib/apt/lists/*
 
-# 2) Créer un utilisateur non-root
-#    - UID/GID 1000 par défaut (modifiable via --build-arg si besoin)
+# ---- Utilisateur non-root idempotent ----
 ARG APP_UID=1000
 ARG APP_GID=1000
-RUN groupadd -g ${APP_GID} appuser \
-  && useradd -m -u ${APP_UID} -g ${APP_GID} -s /usr/sbin/nologin appuser
+ARG USERNAME=appuser
 
-# 3) Préparer le venv et les répertoires
-#    On crée le venv en root, puis on le donne à appuser.
-RUN python3 -m venv /opt/venv && chown -R appuser:appuser /opt/venv
-ENV PATH="/opt/venv/bin:${PATH}"
+RUN set -eux; \
+    # Groupe : si GID existe, on le réutilise; sinon on crée ${USERNAME}
+    if getent group "${APP_GID}" >/dev/null; then \
+        echo "GID ${APP_GID} existe déjà ($(getent group ${APP_GID} | cut -d: -f1))."; \
+    else \
+        groupadd -g "${APP_GID}" "${USERNAME}"; \
+    fi; \
+    # UID : si déjà pris, fallback 1001
+    UID_TO_USE="${APP_UID}"; \
+    if getent passwd "${APP_UID}" >/dev/null; then \
+        echo "UID ${APP_UID} existe déjà ($(getent passwd ${APP_UID} | cut -d: -f1)), fallback 1001."; \
+        UID_TO_USE=1001; \
+    fi; \
+    # Créer l'utilisateur si absent
+    if getent passwd "${USERNAME}" >/dev/null; then \
+        echo "Utilisateur ${USERNAME} existe déjà."; \
+    else \
+        useradd -m -u "${UID_TO_USE}" -g "${APP_GID}" -s /usr/sbin/nologin "${USERNAME}"; \
+    fi
 
-# 4) Passer en appuser pour tout le reste (sécurité)
-USER appuser
+# ---- Python venv (créé en root, possédé par appuser) ----
+RUN set -eux; \
+    python3 -m venv /opt/venv; \
+    chown -R ${USERNAME}:${APP_GID} /opt/venv
+
+# ---- Passage en utilisateur non-root ----
+USER ${USERNAME}
 WORKDIR /app
 
-# 5) Mettre à jour pip (dans le venv) et installer les deps Python
-COPY --chown=appuser:appuser requirements.txt /app/requirements.txt
-RUN python -m pip install --upgrade pip setuptools wheel \
- && pip install -r /app/requirements.txt
+# ---- Dépendances Python ----
+# Astuce: copier seulement requirements.txt d'abord pour tirer parti du cache Docker
+COPY --chown=${USERNAME}:${APP_GID} requirements.txt /app/requirements.txt
 
-# 6) Copier le code de l’app
-COPY --chown=appuser:appuser app /app
+# Mettre à jour pip dans le venv (PEP 668 safe car venv), puis installer deps
+RUN set -eux; \
+    python -m pip install --upgrade pip setuptools wheel; \
+    pip install -r /app/requirements.txt
+
+# ---- Application ----
+COPY --chown=${USERNAME}:${APP_GID} app /app
 
 EXPOSE 8080
-# Uvicorn écoutera sur un port >1024 (OK pour non-root)
+
+# ---- Démarrage ----
+# Uvicorn en non-root (port >1024), logs flushés
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
