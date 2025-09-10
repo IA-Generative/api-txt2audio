@@ -1,5 +1,9 @@
 # Base CUDA + cuDNN + Ubuntu 24.04
-FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04
+#FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04
+
+# Dockerfile
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim
 
 # ---- Environnement ----
 ENV DEBIAN_FRONTEND=noninteractive \
