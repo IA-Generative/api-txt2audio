@@ -1,0 +1,65 @@
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${SERVICE_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  replicas: ${REPLICAS}
+  selector:
+    matchLabels:
+      app: ${SERVICE_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${SERVICE_NAME}
+    spec:
+      containers:
+      - name: ${SERVICE_NAME}
+        image: ghcr.io/ynotopec/${SERVICE_NAME}:main
+        ports:
+        - containerPort: ${APPLICATION_PORT}
+---
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${SERVICE_NAME}-service
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: ${SERVICE_NAME}
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: ${APPLICATION_PORT}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${SERVICE_NAME}.c0.ns1lab.net
+  namespace: ${NAMESPACE}
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/session-cookie-hash: sha1
+    nginx.ingress.kubernetes.io/session-cookie-name: route
+spec:
+  ingressClassName: public
+  rules:
+  - host: ${SERVICE_NAME}.c0.ns1lab.net
+    http:
+      paths:
+      - backend:
+          service:
+            name: ${SERVICE_NAME}-service
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - ${SERVICE_NAME}.c0.ns1lab.net
+    secretName: ${SERVICE_NAME}.c0.ns1lab.net-tls
