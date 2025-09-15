@@ -8,8 +8,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  SERVICE_NAME: github-k8s-example
-  NAMESPACE: github-k8s-example
+  SERVICE_NAME: ${{ github.event.repository.name }}
+  NAMESPACE: ${{ github.event.repository.name }}
   APPLICATION_PORT: 8080
   REPLICAS: 1
   PYTHON_VERSION: 3.12
