@@ -14,15 +14,20 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HUB_ENABLE_HF_TRANSFER=1 \
     PORT=8080 \
     TZ=UTC \
-    LANG=C.UTF-8
+    LANG=C.UTF-8 \
+    # >>> important pour pyopenjtalk (CMake >=3.25 casse la compat <3.5)
+    CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
-# OS deps: audio, JP/CN + toolchain pour compiler pyopenjtalk/langdetect
+# OS deps: audio, JP/CN + toolchain (pyopenjtalk/langdetect)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential gcc g++ make cmake pkg-config swig \
       git curl ca-certificates tzdata \
       ffmpeg libsndfile1 \
       mecab libmecab-dev mecab-ipadic-utf8 \
+      libhtsengine-dev htsengine-api \
       libopenblas-dev \
+      python3-dev \
+      cython3 \
   && rm -rf /var/lib/apt/lists/*
 
 # User non-root
@@ -48,7 +53,7 @@ RUN pip install --upgrade pip wheel setuptools \
 # Code
 COPY app.py /app/app.py
 
-# Health (pas de heredoc pour Kaniko)
+# Healthcheck sans heredoc (Kaniko-friendly)
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
