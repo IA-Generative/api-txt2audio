@@ -23,7 +23,7 @@ COPY requirements.txt /tmp/requirements.txt
 # - Si ton requirements.txt contient torch, remplace par --no-deps ou enlève la ligne torch.
 # - --prefer-binary pour éviter des builds source pénibles
 RUN pip install --upgrade pip wheel setuptools \
- && pip install --prefer-binary --no-deps -r /tmp/requirements.txt \
+ && pip install --prefer-binary -r /tmp/requirements.txt \
  && rm -f /tmp/requirements.txt
 
 # ===== runtime =====
