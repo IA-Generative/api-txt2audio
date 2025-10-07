@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential gcc g++ make cmake pkg-config swig \
       git curl ca-certificates tzdata \
       ffmpeg libsndfile1 \
-      mecab libmecab-dev mecab-ipadic-utf-8 \
+      mecab libmecab-dev mecab-ipadic-utf8 \
       libopenblas-dev \
   && rm -rf /var/lib/apt/lists/*
 
@@ -48,7 +48,7 @@ RUN pip install --upgrade pip wheel setuptools \
 # Code
 COPY app.py /app/app.py
 
-# Réseau & health (pas de heredoc pour Kaniko)
+# Health (pas de heredoc pour Kaniko)
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
