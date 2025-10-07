@@ -1,19 +1,19 @@
 # --- API ---
 fastapi==0.115.0
 uvicorn[standard]==0.37.0
-click>=8.1.7,<9
+#click==8.1.7
 
 # --- NumPy / Hub ---
 numpy==1.26.4
 huggingface_hub==0.25.2
-langdetect==1.0.9
-# python-multipart==0.0.9     # décommente si tu traites des uploads de fichiers
+langdetect==1.0.9            # sdist (pas de wheel) → on autorise sa compile
+# python-multipart==0.0.9     # décommente si tu traites des uploads
 
 # --- Kokoro TTS ---
 kokoro==0.7.0
 
 # --- Japonais ---
-pyopenjtalk==0.3.3
+pyopenjtalk==0.3.3           # sdist → compile
 fugashi[unidic-lite]==1.3.1
 jaconv==0.4.0
 mojimoji==0.0.12
@@ -23,3 +23,6 @@ ordered-set==4.1.0
 pypinyin==0.49.0
 cn2an==0.5.22
 jieba==0.42.1
+
+# --- PyTorch (CPU wheels manylinux) ---
+torch==2.4.1
