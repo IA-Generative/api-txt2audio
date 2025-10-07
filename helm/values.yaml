@@ -24,7 +24,7 @@ app:
   image:
     # -- Repository to use for the app.
     # @section -- App
-    repository: "harbor.sdid.cpin.numerique-interieur.com/tts/api-txt2audio"
+    repository: "harbor.sdid.cpin.numerique-interieur.com/tts/tts"
     # -- Image pull policy for the app.
     # @section -- App
     pullPolicy: "Always"  #IfNotPresent"
