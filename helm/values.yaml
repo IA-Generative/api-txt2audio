@@ -24,7 +24,7 @@ app:
   image:
     # -- Repository to use for the app.
     # @section -- App
-    repository: "harbor.sdid.cpin.numerique-interieur.com/stt/api-audio2txt"
+    repository: "harbor.sdid.cpin.numerique-interieur.com/tts/api-txt2audio"
     # -- Image pull policy for the app.
     # @section -- App
     pullPolicy: "Always"  #IfNotPresent"
@@ -56,7 +56,7 @@ app:
     # -- The list of hosts to be covered by ingress record.
     # @section -- App
     hosts:
-    - "stt.sdid-app-hp.cpin.numerique-interieur.com"
+    - "tts.sdid-app-hp.cpin.numerique-interieur.com"
 #        path: "/"
     # -- Enable TLS configuration.
     # @section -- App
@@ -126,7 +126,7 @@ app:
   # @section -- App
   envFrom:
     - secretRef:
-        name: auth-tokens-api-audio2txt
+        name: auth-tokens-api-txt2audio
   # - configMapRef:
   #     name: my-config
   # - secretRef:
@@ -303,13 +303,13 @@ extraObjects:
  - apiVersion: secrets.hashicorp.com/v1beta1
    kind: VaultStaticSecret
    metadata:
-     name: auth-tokens-api-audio2txt
+     name: auth-tokens-api-txt2audio
    spec:
-     mount: "stt"
+     mount: "tts"
      vaultAuthRef: "vault-auth"
-     path: "prod/auth-tokens-api-audio2txt"
+     path: "prod/auth-tokens-api-txt2audio"
      type: "kv-v2"
      destination:
        create: true
-       name: auth-tokens-api-audio2txt
+       name: auth-tokens-api-txt2audio
        type: "Opaque"
