@@ -1,33 +1,17 @@
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    TOKENIZERS_PARALLELISM=false \
-    OMP_NUM_THREADS=1 \
-    MKL_NUM_THREADS=1 \
-    NUMEXPR_NUM_THREADS=1 \
-    OPENBLAS_NUM_THREADS=1 \
-    HF_HOME=/data/.cache/huggingface \
-    TRANSFORMERS_CACHE=/data/.cache/huggingface/transformers \
-    HF_HUB_ENABLE_HF_TRANSFER=1 \
-    PORT=8080 \
-    TZ=UTC \
-    LANG=C.UTF-8 \
-    CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    PORT=8080
 
-# OS deps: audio, JP/CN + toolchain (pyopenjtalk/langdetect)
+# Installer uniquement ffmpeg
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential gcc g++ make cmake pkg-config swig \
-      git curl ca-certificates tzdata \
-      ffmpeg libsndfile1 \
-      mecab libmecab-dev mecab-ipadic-utf8 \
-      libhtsengine-dev libhtsengine1 \
-      libopenblas-dev python3-dev cython3 \
+      ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
-# User non-root
+# Créer l’utilisateur non-root
 ARG USERNAME=appuser
 ARG UID=10001
 ARG GID=10001
@@ -35,25 +19,21 @@ RUN groupadd -g ${GID} -o ${USERNAME} || true \
  && useradd -m -u ${UID} -g ${GID} -o -s /bin/bash ${USERNAME}
 
 WORKDIR /app
-RUN mkdir -p /data/.cache/huggingface /app \
- && chown -R ${USERNAME}:${USERNAME} /data /app
+COPY requirements.txt /app/requirements.txt
 
-# Deps Python (wheels partout, sauf langdetect et pyopenjtalk qui compilent)
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --upgrade pip wheel setuptools \
- && pip install --prefer-binary \
-      --only-binary=:all: \
-      --no-binary=langdetect,pyopenjtalk \
-      -r /tmp/requirements.txt \
- && rm -f /tmp/requirements.txt
+# Installer les dépendances Python sans pinning, avec les dernières versions
+RUN pip install --upgrade pip \
+ && pip install -r requirements.txt
 
-# Code
+# Copier le code
 COPY app.py /app/app.py
 
-# Réseau & health (Kaniko-friendly)
+# Exposer le port
 EXPOSE 8080
+
+# Healthcheck simple
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
 
 USER ${USERNAME}
-ENTRYPOINT ["sh","-c","exec uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
+ENTRYPOINT ["sh", "-c", "exec uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
