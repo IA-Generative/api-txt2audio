@@ -48,18 +48,10 @@ RUN pip install --upgrade pip wheel setuptools \
 # Code
 COPY app.py /app/app.py
 
-# Réseau & health
+# Réseau & health (pas de heredoc pour Kaniko)
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-  CMD python - <<'PY' || exit 1
-import urllib.request, os
-port=os.environ.get("PORT","8080")
-try:
-    with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=2) as r:
-        import sys; sys.exit(0 if r.status==200 else 1)
-except Exception:
-    raise SystemExit(1)
-PY
+  CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
 
 USER ${USERNAME}
 ENTRYPOINT ["sh","-c","exec uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
