@@ -13,10 +13,11 @@ ENV PATH="/opt/venv/bin:${PATH}" \
 # Copie requirements en premier (cache-friendly)
 COPY requirements.txt /tmp/requirements.txt
 
-# Installer uniquement des wheels (pas de build source mémoire-vore)
-# torch est déjà présent dans l'image base -> ne PAS le réinstaller via requirements.txt
+# Installer principalement des wheels (pas de build source mémoire-vore)
+# torch vient de l'image pytorch -> ne PAS lister dans requirements.txt
+# On fait une exception pour langdetect qui n'a pas de wheel: --no-binary=langdetect
 RUN pip install --upgrade pip wheel setuptools \
- && pip install --only-binary=:all: --prefer-binary -r /tmp/requirements.txt \
+ && pip install --only-binary=:all: --no-binary=langdetect --prefer-binary -r /tmp/requirements.txt \
  && rm -f /tmp/requirements.txt
 
 # ========= Runtime =========
@@ -72,12 +73,12 @@ VOLUME ["/data"]
 
 # Code (assume app.py à la racine du contexte)
 COPY app.py /app/app.py
-# COPY ./assets /app/assets   # si besoin d’assets, puis chown si root a copié
+# COPY ./assets /app/assets   # si besoin d’assets
 # RUN chown -R ${USERNAME}:${USERNAME} /app
 
 EXPOSE 8080
 
-# Healthcheck simple
+# Healthcheck simple (assure-toi d'avoir /healthz dans app.py)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
 
