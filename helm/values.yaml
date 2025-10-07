@@ -56,7 +56,7 @@ app:
     # -- The list of hosts to be covered by ingress record.
     # @section -- App
     hosts:
-    - "tts.sdid-app-hp.cpin.numerique-interieur.com"
+    - "tts.sdid-app.cpin.numerique-interieur.com"
 #        path: "/"
     # -- Enable TLS configuration.
     # @section -- App
