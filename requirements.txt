@@ -1,5 +1,8 @@
 fastapi
+
 uvicorn
+click
+
 torch
 numpy
 huggingface_hub
