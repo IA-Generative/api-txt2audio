@@ -1,32 +1,25 @@
-# ===== base tags =====
-# Même tag pour builder et runtime pour éviter les incohérences de CUDA/cuDNN
+# ========= Base tags =========
+# Même tag pour builder et runtime pour éviter les soucis CUDA/cuDNN
 ARG PYTORCH_TAG=2.4.1-cuda12.4-cudnn9
 
-# ===== builder =====
+# ========= Builder =========
 FROM pytorch/pytorch:${PYTORCH_TAG}-devel AS builder
 
-# Optionnel: outils build SI tu actives JA/ZH qui compilent parfois
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     build-essential cmake pkg-config wget git \
-#  && rm -rf /var/lib/apt/lists/*
-
-# Crée un venv isolé (plus propre que le site-packages global)
+# Venv isolé
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}" \
     PIP_NO_CACHE_DIR=1
 
-# Copie du requirements en premier (layer cache friendly)
+# Copie requirements en premier (cache-friendly)
 COPY requirements.txt /tmp/requirements.txt
 
-# IMPORTANT :
-# - torch est déjà dans l'image base -> ne PAS le réinstaller
-# - Si ton requirements.txt contient torch, remplace par --no-deps ou enlève la ligne torch.
-# - --prefer-binary pour éviter des builds source pénibles
+# Installer uniquement des wheels (pas de build source mémoire-vore)
+# torch est déjà présent dans l'image base -> ne PAS le réinstaller via requirements.txt
 RUN pip install --upgrade pip wheel setuptools \
- && pip install --prefer-binary -r /tmp/requirements.txt \
+ && pip install --only-binary=:all: --prefer-binary -r /tmp/requirements.txt \
  && rm -f /tmp/requirements.txt
 
-# ===== runtime =====
+# ========= Runtime =========
 FROM pytorch/pytorch:${PYTORCH_TAG}-runtime AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -49,12 +42,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WORD_MAX_QUEUE=48 \
     SENTENCE_POLICY=reject_new \
     WORD_POLICY=drop_oldest \
-    PORT=8080
+    PORT=8080 \
+    TZ=UTC \
+    LANG=C.UTF-8
 
-# ffmpeg pour mp3/opus/webm + libs de base
+# Packages runtime (audio + ja)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg libsndfile1 curl ca-certificates tzdata \
-      mecab libmecab2 mecab-ipadic-utf8 \
+      mecab libmecab2 mecab-ipadic-utf-8 \
       libopenblas0 \
  && rm -rf /var/lib/apt/lists/*
 
@@ -65,7 +60,7 @@ ARG GID=10001
 RUN groupadd -g ${GID} -o ${USERNAME} || true \
  && useradd -m -u ${UID} -g ${GID} -o -s /bin/bash ${USERNAME}
 
-# Copie du venv figé depuis le builder
+# Copier le venv figé depuis le builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
@@ -75,14 +70,18 @@ RUN mkdir -p /data/.cache/huggingface /app \
  && chown -R ${USERNAME}:${USERNAME} /data /app
 VOLUME ["/data"]
 
-# Code
+# Code (assume app.py à la racine du contexte)
 COPY app.py /app/app.py
-# (Facultatif) si tu ajoutes des assets, fais un chown:
+# COPY ./assets /app/assets   # si besoin d’assets, puis chown si root a copié
 # RUN chown -R ${USERNAME}:${USERNAME} /app
 
 EXPOSE 8080
+
+# Healthcheck simple
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
 
 USER ${USERNAME}
-ENTRYPOINT ["bash","-lc","exec uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
+
+# Démarrage Uvicorn
+ENTRYPOINT ["sh","-c","exec uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
