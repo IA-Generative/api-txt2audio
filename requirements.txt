@@ -5,8 +5,8 @@ numpy
 huggingface_hub
 kokoro
 langdetect
-python-multipart
-fasttext
+#python-multipart
+#fasttext
 
 #japeneese
 pyopenjtalk
