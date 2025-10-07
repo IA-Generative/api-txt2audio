@@ -1,0 +1,14 @@
+.git
+__pycache__/
+*.pyc
+*.pyo
+*.log
+dist/
+build/
+*.whl
+data/
+models/
+weights/
+artifacts/
+logs/
+.cache/
