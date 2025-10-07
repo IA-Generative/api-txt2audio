@@ -1,0 +1,15 @@
+{{- if or .Values.app.env .Values.global.env -}}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "helper.fullname" . }}
+  labels:
+    {{- include "helper.labels" . | nindent 4 }}
+data:
+  {{- if .Values.global.env -}}
+  {{- include "helper.env" .Values.global | indent 2 }}
+  {{- end -}}
+  {{- if .Values.app.env -}}
+  {{- include "helper.env" .Values.app | indent 2 }}
+  {{- end -}}
+{{- end -}}

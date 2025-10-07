@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "helper.fullname" . }}
+  labels:
+    {{- include "helper.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.app.autoscaling.enabled }}
+  replicas: {{ .Values.app.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "helper.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: {{ .Values.app.strategy.type }}
+  template:
+    metadata:
+      annotations:
+        {{- if .Values.app.viteEnv -}}
+        {{- include "helper.checksum" (list $ "/vite-config.yaml") | nindent 8 }}
+        {{- end }}
+        {{- if or .Values.app.env .Values.global.env -}}
+        {{- include "helper.checksum" (list $ "/configmap.yaml") | nindent 8 }}
+        {{- end }}
+        {{- if or .Values.app.secrets .Values.global.secrets -}}
+        {{- include "helper.checksum" (list $ "/secret.yaml") | nindent 8 }}
+        {{- end }}
+        {{- with .Values.app.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "helper.selectorLabels" . | nindent 8 }}
+        {{- with .Values.app.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "helper.serviceAccountName" . }}
+      {{- if .Values.app.image.pullSecrets }}
+      imagePullSecrets:
+      {{- toYaml .Values.app.image.pullSecrets | nindent 6 }}
+      {{- end }}
+      {{- if .Values.app.podSecurityContext }}
+      securityContext:
+        {{- toYaml .Values.app.podSecurityContext | nindent 8 }}
+      {{- end }}
+      {{- if .Values.app.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .Values.app.initContainers) . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: app
+        {{- if .Values.app.container.securityContext }}
+        securityContext:
+          {{- toYaml .Values.app.container.securityContext | nindent 12 }}
+        {{- end }}
+        image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+        {{- if .Values.app.container.command }}
+        command:
+        {{- range .Values.app.container.command }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.app.container.args }}
+        args:
+        {{- range .Values.app.container.args }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        ports:
+          - containerPort: {{ .Values.app.container.port }}
+            protocol: TCP
+        {{- $hasConfigMapEnv := or .Values.app.env .Values.global.env }}
+        {{- $hasSecretEnv := or .Values.app.secrets .Values.global.secrets }}
+        {{- $hasEnvFrom := .Values.app.envFrom }}
+        {{- if or $hasConfigMapEnv (or $hasSecretEnv $hasEnvFrom) }}
+        envFrom:
+          {{- if $hasConfigMapEnv }}
+          - configMapRef:
+              name: {{ include "helper.fullname" . }}
+          {{- end }}
+          {{- if $hasSecretEnv }}
+          - secretRef:
+              name: {{ include "helper.fullname" . }}
+          {{- end }}
+          {{- if $hasEnvFrom }}
+            {{- toYaml .Values.app.envFrom | nindent 10 }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.app.startupProbe.enabled }}
+        startupProbe:
+          httpGet:
+            path: {{ .Values.app.healthcheckPath }}
+            port: {{ .Values.app.container.port }}
+          initialDelaySeconds: {{ .Values.app.startupProbe.initialDelaySeconds }}
+          successThreshold: {{ .Values.app.startupProbe.successThreshold }}
+          failureThreshold: {{ .Values.app.startupProbe.failureThreshold }}
+          periodSeconds: {{ .Values.app.startupProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.app.startupProbe.timeoutSeconds }}
+        {{- end }}
+        {{- if .Values.app.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.app.healthcheckPath }}
+            port: {{ .Values.app.container.port }}
+          initialDelaySeconds: {{ .Values.app.readinessProbe.initialDelaySeconds }}
+          successThreshold: {{ .Values.app.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.app.readinessProbe.failureThreshold }}
+          periodSeconds: {{ .Values.app.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.app.readinessProbe.timeoutSeconds }}
+        {{- end }}
+        {{- if .Values.app.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.app.healthcheckPath }}
+            port: {{ .Values.app.container.port }}
+          initialDelaySeconds: {{ .Values.app.livenessProbe.initialDelaySeconds }}
+          successThreshold: {{ .Values.app.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.app.livenessProbe.failureThreshold }}
+          periodSeconds: {{ .Values.app.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.app.livenessProbe.timeoutSeconds }}
+        {{- end }}
+        {{- if .Values.app.hostAliases }}
+        hostAliases:
+          {{- toYaml .Values.app.hostAliases | nindent 8 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.app.resources | nindent 10 }}
+        {{- if .Values.app.extraVolumeMounts }}
+        volumeMounts:
+        {{- tpl (toYaml .Values.app.extraVolumeMounts) . | nindent 8 }}
+        {{- end }}
+      {{- if .Values.app.extraContainers }}
+        {{- tpl (toYaml .Values.app.extraContainers) . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.app.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.app.extraVolumes }}
+      volumes:
+      {{- tpl (toYaml .Values.app.extraVolumes) . | nindent 6 }}
+      {{- end }}

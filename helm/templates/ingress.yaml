@@ -1,0 +1,35 @@
+{{- if .Values.app.ingress.enabled -}}
+{{- $fullNameApp := include "helper.fullname" . -}}
+{{- $svcPortApp := .Values.app.service.port -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "helper.fullname" .  }}
+  labels: {{- tpl (toYaml .Values.app.ingress.labels | nindent 4) . }}
+  annotations: {{- tpl (toYaml .Values.app.ingress.annotations | nindent 4) . }}
+spec:
+  ingressClassName: {{ .Values.app.ingress.className }}
+  {{- if gt (len .Values.app.ingress.tls) 0 }}
+  tls:
+  {{- range .Values.app.ingress.tls }}
+  - hosts:
+    {{- range .hosts }}
+    - {{ . | quote }}
+    {{- end }}
+    secretName: {{ .secretName | quote | default (printf "%s-%s" $fullNameApp "tls") }}
+  {{- end }}
+  {{- end }}
+  rules:
+  {{- range .Values.app.ingress.hosts }}
+  - host: {{ . | quote }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ $fullNameApp }}
+            port:
+              number: {{ $svcPortApp }}
+  {{- end }}
+{{- end }}
