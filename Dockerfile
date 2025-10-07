@@ -1,88 +1,65 @@
-# ========= Base tags =========
-# Même tag pour builder et runtime pour éviter les soucis CUDA/cuDNN
-ARG PYTORCH_TAG=2.4.1-cuda12.4-cudnn9
-
-# ========= Builder =========
-FROM pytorch/pytorch:${PYTORCH_TAG}-devel AS builder
-
-# Venv isolé
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:${PATH}" \
-    PIP_NO_CACHE_DIR=1
-
-# Copie requirements en premier (cache-friendly)
-COPY requirements.txt /tmp/requirements.txt
-
-# Installer principalement des wheels (pas de build source mémoire-vore)
-# torch vient de l'image pytorch -> ne PAS lister dans requirements.txt
-# On fait une exception pour langdetect qui n'a pas de wheel: --no-binary=langdetect
-RUN pip install --upgrade pip wheel setuptools \
- && pip install --only-binary=:all: --no-binary=langdetect --prefer-binary -r /tmp/requirements.txt \
- && rm -f /tmp/requirements.txt
-
-# ========= Runtime =========
-FROM pytorch/pytorch:${PYTORCH_TAG}-runtime AS runtime
+FROM python:3.11-slim AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    HF_HOME=/data/.cache/huggingface \
-    TRANSFORMERS_CACHE=/data/.cache/huggingface/transformers \
-    HF_HUB_ENABLE_HF_TRANSFER=1 \
     TOKENIZERS_PARALLELISM=false \
     OMP_NUM_THREADS=1 \
     MKL_NUM_THREADS=1 \
     NUMEXPR_NUM_THREADS=1 \
     OPENBLAS_NUM_THREADS=1 \
-    BATCH_SIZE=12 \
-    MAX_WAIT_MS=12 \
-    SENTENCE_MAX_QUEUE=48 \
-    WORD_MAX_QUEUE=48 \
-    SENTENCE_POLICY=reject_new \
-    WORD_POLICY=drop_oldest \
+    HF_HOME=/data/.cache/huggingface \
+    TRANSFORMERS_CACHE=/data/.cache/huggingface/transformers \
+    HF_HUB_ENABLE_HF_TRANSFER=1 \
     PORT=8080 \
     TZ=UTC \
     LANG=C.UTF-8
 
-# Packages runtime (audio + ja)
+# OS deps: audio, JP/CN + toolchain pour compiler pyopenjtalk/langdetect
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ffmpeg libsndfile1 curl ca-certificates tzdata \
-      mecab libmecab2 mecab-ipadic-utf-8 \
-      libopenblas0 \
- && rm -rf /var/lib/apt/lists/*
+      build-essential gcc g++ make cmake pkg-config swig \
+      git curl ca-certificates tzdata \
+      ffmpeg libsndfile1 \
+      mecab libmecab-dev mecab-ipadic-utf-8 \
+      libopenblas-dev \
+  && rm -rf /var/lib/apt/lists/*
 
-# Utilisateur non-root
+# User non-root
 ARG USERNAME=appuser
 ARG UID=10001
 ARG GID=10001
 RUN groupadd -g ${GID} -o ${USERNAME} || true \
  && useradd -m -u ${UID} -g ${GID} -o -s /bin/bash ${USERNAME}
 
-# Copier le venv figé depuis le builder
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:${PATH}"
-
-# Dossiers appli & cache
 WORKDIR /app
 RUN mkdir -p /data/.cache/huggingface /app \
  && chown -R ${USERNAME}:${USERNAME} /data /app
-VOLUME ["/data"]
 
-# Code (assume app.py à la racine du contexte)
+# Deps Python (wheels partout, sauf langdetect et pyopenjtalk)
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --upgrade pip wheel setuptools \
+ && pip install --prefer-binary \
+      --only-binary=:all: \
+      --no-binary=langdetect,pyopenjtalk \
+      -r /tmp/requirements.txt \
+ && rm -f /tmp/requirements.txt
+
+# Code
 COPY app.py /app/app.py
-# COPY ./assets /app/assets   # si besoin d’assets
-# RUN chown -R ${USERNAME}:${USERNAME} /app
 
+# Réseau & health
 EXPOSE 8080
-
-# Healthcheck simple (assure-toi d'avoir /healthz dans app.py)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-  CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
+  CMD python - <<'PY' || exit 1
+import urllib.request, os
+port=os.environ.get("PORT","8080")
+try:
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=2) as r:
+        import sys; sys.exit(0 if r.status==200 else 1)
+except Exception:
+    raise SystemExit(1)
+PY
 
 USER ${USERNAME}
-
-# Démarrage Uvicorn
 ENTRYPOINT ["sh","-c","exec uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
