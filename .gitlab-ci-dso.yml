@@ -12,7 +12,7 @@ default:
 variables:
   TAG: "${CI_COMMIT_REF_SLUG}"
   REGISTRY_URL: "${REGISTRY_HOST}/${PROJECT_PATH}"
-  PYTHON_VERSION: "3.11"           # déjà présent chez toi
+  PYTHON_VERSION: "3.12"           # déjà présent chez toi
   TORCH_CUDA_ARCH_LIST: "9.0"  # A100 + H100 (ajuste si besoin)
 
 stages:
