@@ -1,28 +1,14 @@
-include:
-  - project: $CATALOG_PATH
-    file: vault-ci.yml
-    ref: main
-  - project: $CATALOG_PATH
-    file: kaniko-ci.yml
-    ref: main
-
-default:
-  image: alpine:latest
-
 variables:
   TAG: "${CI_COMMIT_REF_SLUG}"
   REGISTRY_URL: "${REGISTRY_HOST}/${PROJECT_PATH}"
-  PYTHON_VERSION: "3.12"           # déjà présent chez toi
-  TORCH_CUDA_ARCH_LIST: "9.0"  # A100 + H100 (ajuste si besoin)
+  PYTHON_VERSION: "3.12"
+  TORCH_CUDA_ARCH_LIST: "9.0"  # OK même si ignoré (aucune compile)
 
-stages:
-  - read-secret
-  - docker-build
-
-read_secret:
-  stage: read-secret
-  extends:
-    - .vault:read_secret
+  # >>> Réservations pour éviter TerminationByKubelet
+  KUBERNETES_MEMORY_REQUEST: "8Gi"   # ou 10Gi si nœuds costauds
+  KUBERNETES_MEMORY_LIMIT:   "16Gi"  # ≥ 14–16Gi (pic ~12.6Gi)
+  KUBERNETES_CPU_REQUEST:    "2"
+  KUBERNETES_CPU_LIMIT:      "4"
 
 docker-build-app:
   stage: docker-build
@@ -37,3 +23,9 @@ docker-build-app:
     EXTRA_BUILD_ARGS: >
       --build-arg PYTHON_VERSION=${PYTHON_VERSION}
       --build-arg TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
+    # Si ton template expose KANIKO_ARGS (ou EXTRA_ARGS), utilise :
+    KANIKO_ARGS: >
+      --snapshotMode=redo
+      --cache=true
+      --cache-copy-layers
+      --verbosity=info
