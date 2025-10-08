@@ -2,7 +2,7 @@
 # Dockerfile minimal · préfère les wheels · image finale slim
 # =========================================================
 # Étape 1 : télécharge les artefacts (wheels si dispo, sinon sdists)
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-slim AS wheels
 
 ENV PIP_NO_CACHE_DIR=1 \
