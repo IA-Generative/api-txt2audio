@@ -19,7 +19,7 @@ global:
 app:
   # -- The number of application controller pods to run.
   # @section -- App
-  replicaCount: 2
+  replicaCount: 1
   ## App image.
   image:
     # -- Repository to use for the app.
@@ -254,16 +254,16 @@ app:
       memory: "1Gi"
       # -- CPU request for the app.
       # @section -- App
-      cpu: "100m"
+      cpu: "250m"
       # -- GPU request for the app.
       nvidia.com/mig-1g.10gb: 1
     limits:
       # -- Memory limit for the app.
       # @section -- App
-      memory: "8Gi"
+      memory: "6Gi"
       # -- CPU limit for the app.
       # @section -- App
-      cpu: "4000m"
+      cpu: "3000m"
       # -- GPU limit for the app.
       nvidia.com/mig-1g.10gb: 1
   autoscaling:
