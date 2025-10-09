@@ -71,13 +71,15 @@ RUN python3 -m pip install \
       kokoro \
       pyopenjtalk \
       fugashi[unidic-lite] \
-      jaconv \ 
+      jaconv \
       mojimoji \
       ordered-set\
       pypinyin \
       cn2an \
       langdetect \
-      jieba
+      jieba \
+      numpy \
+      huggingface_hub
 
 
 
