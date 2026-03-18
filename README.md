@@ -1,35 +1,28 @@
-# API Text-to-Audio (Kokoro-82M)
+# api-txt2audio
 
-API FastAPI de synthèse vocale multilingue (fr/en/es/it/pt/ja/zh...) basée sur le modèle `hexgrad/Kokoro-82M`.
+API FastAPI de synthèse vocale multilingue (Kokoro-82M) avec sortie `wav|mp3|opus|webm`.
 
-## Démarrage rapide (≤ 10 min)
+## Objectif
+Transformer un texte en audio via un endpoint HTTP unique : `POST /v1/audio/speech`.
 
-➡️ Guide OpenWebUI : `OpenWEBUI-doc/README.md`
-
-## Construction de l'image Docker
-### Option A — Exécution locale
-
-Prérequis:
+## Prérequis
 - Python 3.11+
-- `ffmpeg` installé dans le PATH
+- `ffmpeg` installé et accessible dans le `PATH`
 
+## Démarrage en une commande
 ```bash
 make run
 ```
 
-Par défaut, l'API écoute sur `http://localhost:8080` avec le token local `dev-token`.
+L'API démarre sur `http://localhost:8080` avec le token par défaut `dev-token`.
 
-### Option B — Exécution déterministe via Docker
-
+## Test rapide
+### 1) Vérifier la base technique
 ```bash
-docker build -t api-txt2audio:local .
-docker run --rm -p 8080:8080 \
-  -e API_TOKENS=dev-token \
-  api-txt2audio:local
+make smoke
 ```
 
-## Exemple reproductible entrée/sortie
-
+### 2) Générer un MP3
 ```bash
 curl -X POST "http://localhost:8080/v1/audio/speech" \
   -H "Authorization: Bearer dev-token" \
@@ -38,68 +31,25 @@ curl -X POST "http://localhost:8080/v1/audio/speech" \
   --output sample.mp3
 ```
 
-Validation du résultat:
-
+Validation minimale :
 ```bash
 file sample.mp3
-# attendu: Audio file with ID3 / MPEG layer III (durée > 0s)
 ```
 
-## Endpoints principaux
-
-- `GET /healthz` : statut service + cache.
+## Endpoints
+- `GET /healthz` : état du service et du cache voix.
 - `GET /readyz` : readiness du pipeline.
-- `POST /v1/audio/speech` : génération audio (`wav|mp3|opus|webm`).
+- `POST /v1/audio/speech` : génération audio.
 
-## Variables d'environnement utiles
-
-- `API_TOKENS` (obligatoire) : token(s) séparé(s) par virgule/espace (`*` pour tout accepter).
+## Variables d'environnement
+- `API_TOKENS` : token(s) autorisés (obligatoire en environnement non local).
 - `PORT` : port HTTP (défaut `8080`).
-- `CORS_ALLOW_ORIGINS` : liste d'origines CORS.
-- `RATE_WINDOW_S`, `RATE_MAX_REQ` : limite de débit.
+- `CORS_ALLOW_ORIGINS` : origines CORS autorisées.
+- `RATE_WINDOW_S`, `RATE_MAX_REQ` : paramètres de limitation de débit.
 
-## Documentation projet
-
-2. Déployez l'application avec Helm :
-
-   ```bash
-   helm install api-txt2audio ./helm/api-txt2audio
-   ```
-
-3. Vérifiez que le certificat TLS est émis et que l'Ingress est configuré correctement :
-
-   ```bash
-   kubectl get ingress
-   kubectl describe certificate
-   ```
-
----
-
-## 🧭 Diagramme d'architecture
-
-```mermaid
-flowchart LR
-    subgraph Kubernetes Cluster
-        direction LR
-        Ingress["Ingress NGINX<br/>+ TLS cert-manager"]
-        Service["Service ClusterIP"]
-        App["FastAPI<br/>api-txt2audio"]
-        Model["Kokoro-82M<br/>(Hugging Face)"]
-    end
-
-    Client((Client HTTPS)) -->|Requête /synthesize| Ingress
-    Ingress --> Service
-    Service --> App
-    App -->|Texte| Model
-    Model -->|Audio WAV/MP3| App
-    App -->|Réponse audio| Client
-```
-
-## 🗂️ State / Flow Documentation
-
-See `STATE.md` for the router/decision flow and a critical test-case sequence.
-- Vue d'ensemble: `docs/overview.md`
-- Architecture: `docs/architecture.md`
-- Cas d'usage: `USE_CASE.md`
-- Valeur métier: `VALUE.md`
-- Statut innovation: `INNOVATION_STATUS.md`
+## Documentation
+- Architecture technique : `docs/architecture.md`
+- Cas d'usage et test critique : `USE_CASE.md`
+- Valeur métier : `VALUE.md`
+- Statut d'innovation : `INNOVATION_STATUS.md`
+- Intégration OpenWebUI : `OpenWEBUI-doc/README.md`

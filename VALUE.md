@@ -1,39 +1,40 @@
 # Valeur métier
 
-## 🎯 Problème métier ciblé
-La production de messages vocaux personnalisés est lente, coûteuse et difficile à industrialiser lorsqu'elle dépend d'enregistrements humains.
+## Problème métier ciblé
+La production de messages vocaux personnalisés est souvent manuelle, lente et coûteuse (rédaction + enregistrement + retouches). Cela freine les usages à grande échelle (notification client, relance, information en masse).
 
-## ⏱ Temps économisé (estimation)
-- Hypothèse: 200 messages/semaine.
-- Processus manuel: ~8 min/message (rédaction + enregistrement + export).
-- Processus API: ~1 min/message (génération + intégration).
-- **Gain estimé: ~1 400 min/semaine (~23 h/semaine).**
+## ROI estimé
+### Hypothèses
+- Volume : **200 messages/semaine**.
+- Temps manuel : **8 min/message**.
+- Temps via API : **1 min/message**.
+- Coût interne : **45 €/h**.
+- Période annuelle : **48 semaines**.
 
-## 💰 Coût évité/réduit (estimation)
-- Hypothèse coût interne: 45 €/h.
-- 23 h/semaine économisées ≈ **1 035 €/semaine**.
-- Annualisé (48 semaines): **~49 680 €/an**.
+### Calculs
+- Temps économisé : `(8 - 1) * 200 = 1 400 min/semaine` soit **~23,3 h/semaine**.
+- Coûts réduits : `23,3 h * 45 € = ~1 050 €/semaine`.
+- Gain annualisé : `~1 050 € * 48 = ~50 400 €/an`.
 
-## 🛡 Risque diminué
-- Réduit le risque d'incohérence de messages entre agents.
-- Réduit la dépendance à une ressource humaine unique pour la voix.
-- Réduit les retards de diffusion en période de pic.
+## Risques diminués
+- Variabilité de ton/qualité entre agents réduite.
+- Dépendance à une ressource humaine unique réduite.
+- Risque de retard de publication en période de pic réduit.
 
-## 🚀 Capacité nouvelle créée
-- Génération audio à la demande, multilingue, intégrable en temps réel dans les workflows CRM/ops.
+## Capacités créées
+- Génération audio à la demande, multilingue, API-first.
+- Intégration directe dans CRM / workflows automatisés.
+- Réutilisation transverse (support, marketing, opérations).
 
-## KPIs proposés
-- Délai moyen de génération audio (p95, secondes).
-- Nombre de messages générés par semaine.
-- Taux de réutilisation de l'API par application consommatrice.
-- Taux d'échec API (4xx/5xx) et taux d'erreur TTS.
-
-## Hypothèses explicites
-- Volume stable entre 100 et 500 messages/semaine.
-- Utilisation majoritaire en messages courts (< 60 secondes).
-- Infrastructure cible avec `ffmpeg` disponible et connectivité HF Hub.
+## KPIs de suivi
+- Latence p95 de génération audio (s).
+- Taux de succès API (`2xx`) et taux d'erreur (`4xx`/`5xx`).
+- Nombre de messages audio générés / semaine.
+- Taux de réutilisation par applications consommatrices.
+- Coût moyen par message généré.
 
 ## Conditions de validité
-- Token d'auth correctement géré.
-- Monitoring minimal en place (latence, erreurs).
-- Revue qualité audio sur les langues critiques avant passage à grande échelle.
+- `ffmpeg` disponible sur les environnements cibles.
+- Connectivité vers Hugging Face Hub pour le bootstrap des voix.
+- Politique d'authentification (`API_TOKENS`) active.
+- Monitoring minimal en place (latence, erreurs, volume).
