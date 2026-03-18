@@ -4,6 +4,8 @@
 
 API FastAPI pour la synthèse vocale, utilisant le modèle Kokoro-82M de Hugging Face.
 
+➡️ Guide OpenWebUI : `OpenWEBUI-doc/README.md`
+
 ## Construction de l'image Docker
 
 ```bash
