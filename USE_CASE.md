@@ -1,23 +1,62 @@
 # Cas d'usage réel
 
-## Contexte
-Un centre de relation client veut produire des messages vocaux multilingues (confirmation de rendez-vous, relance, informations opérationnelles) sans studio d'enregistrement.
+## Contexte métier
+Un centre de relation client veut générer rapidement des messages vocaux multilingues (confirmation de rendez-vous, relance, information opérationnelle) sans studio d'enregistrement.
 
 ## Acteurs
-- Équipe produit/service client
-- Système CRM qui appelle l'API
-- Destinataires finaux (clients)
+- Équipe Service Client
+- CRM / orchestrateur métier
+- API `api-txt2audio`
+- Client final (destinataire du message audio)
 
-## Scénario
-1. Le CRM envoie un texte personnalisé à `/v1/audio/speech`.
-2. L'API génère un MP3 dans la langue détectée.
-3. Le CRM stocke ou diffuse immédiatement l'audio.
+## Scénario cible
+1. Le CRM compose un message personnalisé.
+2. Le CRM appelle `POST /v1/audio/speech`.
+3. L'API renvoie un fichier audio prêt à diffuser.
+4. Le CRM stocke l'audio ou le diffuse immédiatement.
 
 ## Résultat attendu
-- Mise à disposition d'un message audio en quelques secondes.
-- Homogénéité de ton/voix entre campagnes.
+- Audio généré en quelques secondes.
+- Ton homogène d'un message à l'autre.
 - Réduction des tâches manuelles de production audio.
 
-## Exemple I/O métier
-- Entrée: "Bonjour Mme Martin, votre rendez-vous est confirmé pour demain 9h."
-- Sortie: fichier `mp3` utilisable dans un appel automatisé ou un canal messaging.
+---
+
+## (B) Séquence du Test Critique (reproductible)
+
+### Objectif
+Valider le chemin critique "entrée texte valide -> sortie audio MP3".
+
+### Préconditions
+- API démarrée via `make run`.
+- Token local par défaut : `dev-token`.
+
+### Données d'entrée (déterministes)
+Payload JSON exact :
+```json
+{
+  "input": "Bonjour Mme Martin, votre rendez-vous est confirmé pour demain 9h.",
+  "voice": "heart",
+  "gender": "f",
+  "response_format": "mp3"
+}
+```
+
+### Commande d'exécution
+```bash
+curl -sS -X POST "http://localhost:8080/v1/audio/speech" \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"input":"Bonjour Mme Martin, votre rendez-vous est confirmé pour demain 9h.","voice":"heart","gender":"f","response_format":"mp3"}' \
+  --output critical_test.mp3
+```
+
+### Sortie attendue (reproductible)
+1. Fichier `critical_test.mp3` créé.
+2. Taille strictement supérieure à 0 octet.
+3. `file critical_test.mp3` retourne un type audio MPEG/MP3.
+
+### Vérification
+```bash
+test -s critical_test.mp3 && file critical_test.mp3
+```

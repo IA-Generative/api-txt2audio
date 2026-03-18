@@ -1,29 +1,36 @@
 # Architecture
 
+## Résumé technique
+Le service expose une API FastAPI de Text-to-Speech :
+1. authentification Bearer,
+2. validation de payload,
+3. découpage linguistique,
+4. sélection de voix Kokoro,
+5. génération audio,
+6. transcodage via `ffmpeg`,
+7. streaming de la réponse.
+
 ## Composants
-- **Client**: envoie une requête TTS HTTP.
-- **FastAPI app (`app.py`)**: auth, rate-limit, orchestration pipeline.
-- **Kokoro pipeline**: synthèse vocale et chargement des voix HF.
-- **FFmpeg**: transcodage streaming en format cible.
-- **Stock externe HF Hub**: récupération des voix.
+- **Client HTTP** : envoie le texte à synthétiser.
+- **FastAPI (`app.py`)** : auth, rate-limit, validation, orchestration.
+- **Kokoro-82M** : pipeline de génération vocale.
+- **Hugging Face Hub** : téléchargement des voix (`voices/*.pt`).
+- **FFmpeg** : conversion de flux vers `wav|mp3|opus|webm`.
 
-## Diagramme
-
+## Schéma
 ```mermaid
 flowchart LR
-  C[Client HTTP] --> A[FastAPI /v1/audio/speech]
+  C[Client] --> A[FastAPI /v1/audio/speech]
   A --> B{Auth + Rate limit}
-  B --> D[Split langue + sélection voix]
-  D --> E[Kokoro-82M pipeline]
-  E --> F[Flux WAV interne]
-  F --> G[FFmpeg transcodeur]
-  G --> H[Réponse audio streaming]
-  E -. télécharge voix .-> I[Hugging Face Hub]
+  B --> D[Validation + nettoyage texte]
+  D --> E[Découpage langue + sélection voix]
+  E --> F[Kokoro-82M]
+  F --> G[Flux WAV interne]
+  G --> H[FFmpeg]
+  H --> I[Streaming audio]
+  F -. voix .-> J[Hugging Face Hub]
 ```
 
-## Flux d'exécution (résumé)
-1. Vérification du token Bearer.
-2. Validation JSON (Pydantic).
-3. Découpage multilingue + détection langue.
-4. Chargement/caching pipeline + voix.
-5. Génération audio + streaming de la réponse.
+## Exécution standard
+- Lancement local : `make run`
+- Vérification minimale : `make smoke`
