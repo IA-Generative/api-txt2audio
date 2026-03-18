@@ -4,6 +4,9 @@ API FastAPI de synthèse vocale multilingue (fr/en/es/it/pt/ja/zh...) basée sur
 
 ## Démarrage rapide (≤ 10 min)
 
+➡️ Guide OpenWebUI : `OpenWEBUI-doc/README.md`
+
+## Construction de l'image Docker
 ### Option A — Exécution locale
 
 Prérequis:
