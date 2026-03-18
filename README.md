@@ -106,3 +106,7 @@ flowchart LR
     Model -->|Audio WAV/MP3| App
     App -->|Réponse audio| Client
 ```
+
+## 🗂️ State / Flow Documentation
+
+See `STATE.md` for the router/decision flow and a critical test-case sequence.
